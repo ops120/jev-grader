@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JEV 智能改卷系统</title>
+<link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="/static/style.css?v=GRADER1">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">JEV</span>
+    <div class="brand-text">
+      <h1 id="app-title">JEV 智能改卷系统</h1>
+      <p class="sub">左栏题面 · 中栏答案 · 右栏 JEV 运算过程</p>
+    </div>
+  </div>
+  <div class="paper-switch" id="paper-switch"></div>
+  <div class="stats" id="stats"></div>
+  <div class="actions">
+    <button class="btn" id="btn-summary">答案汇总</button>
+    <button class="btn" id="btn-solve-one" title="重新求解当前题">求解本题</button>
+    <button class="btn btn-primary" id="btn-solve-all">求解全卷</button>
+    <button class="btn" id="btn-clear" title="删除已求解的判定轨迹">清空解答</button>
+  </div>
+</header>
+
+<main class="workbench" id="workbench">
+
+  <nav class="rail" id="rail">
+    <div class="rail-head">试卷导航</div>
+    <div class="rail-body" id="rail-body"></div>
+  </nav>
+
+  <section class="pane pane-question">
+    <header class="pane-head">
+      <h2>题面</h2>
+      <span class="chip chip-ghost" id="q-meta"></span>
+    </header>
+    <div class="pane-body" id="pane-question"></div>
+  </section>
+
+  <section class="pane pane-answer" id="answer-section">
+    <header class="pane-head">
+      <h2>答案</h2>
+      <span class="chip chip-ghost" id="a-meta"></span>
+      <button class="icon-btn" id="btn-collapse" title="折叠答案栏（快捷键 C）">
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </header>
+    <div class="pane-body" id="pane-answer"></div>
+    <button class="answer-strip" id="answer-strip" title="展开答案栏">
+      <span class="strip-label">答案</span>
+      <span class="strip-answer" id="strip-answer">—</span>
+    </button>
+  </section>
+
+  <section class="pane pane-trace">
+    <header class="pane-head">
+      <h2>JEV 运算过程</h2>
+      <span class="chip chip-ghost" id="t-meta"></span>
+    </header>
+    <div class="trace-top">
+      <div class="trace-bar" id="trace-bar">
+        <span class="demo-badge"
+              title="各步判断由同一次请求并行完成，此处按判定依赖顺序回放，便于观察。播放节奏为演示性质，非模型真实耗时。">
+          演示回放
+        </span>
+        <button class="tb-btn tb-play" id="tb-play" title="播放 / 暂停（P）" aria-label="播放">
+          <span id="tb-play-icon">▶</span>
+        </button>
+        <button class="tb-btn" id="tb-replay" title="重播（R）" aria-label="重播">↺</button>
+        <button class="tb-btn" id="tb-step" title="单步推进（N）" aria-label="单步">⇥</button>
+        <select class="tb-speed" id="tb-speed" title="播放速度" aria-label="播放速度">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+        </select>
+        <span class="tb-phase" id="tb-phase">— / —</span>
+        <span class="tb-progress"><span class="tb-fill" id="tb-fill"></span></span>
+        <button class="tb-btn tb-text" id="tb-toggle" title="展开或折叠全部步骤">全部展开</button>
+      </div>
+      <div class="tb-metrics" id="tb-metrics" hidden></div>
+    </div>
+    <div class="pane-body" id="pane-trace"></div>
+  </section>
+
+</main>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-mask" id="modal-mask"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="答案汇总">
+    <header class="modal-head">
+      <h2>答案汇总</h2>
+      <div class="modal-tools">
+        <button class="btn" id="btn-copy">复制为文本</button>
+        <button class="btn" id="btn-close">关闭</button>
+      </div>
+    </header>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<div class="modal" id="confirm" hidden>
+  <div class="modal-mask" id="confirm-mask"></div>
+  <div class="modal-panel confirm-panel" role="dialog" aria-modal="true" aria-label="清空解答">
+    <header class="modal-head"><h2 id="confirm-title">清空解答</h2></header>
+    <div class="modal-body" id="confirm-body"></div>
+    <footer class="modal-foot" id="confirm-foot"></footer>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/static/vendor/katex/katex.min.js"></script>
+<script src="/static/app.js?v=GRADER1"></script>
+</body>
+</html>

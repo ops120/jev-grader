@@ -1,0 +1,242 @@
+{
+  "name": "xingce",
+  "display_name": "2026 国考行测",
+  "compose_strategy": "single_choice_cross_check",
+  "answer_shape": "single",
+  "trace_fields": {},
+  "kind_default": "mcq",
+  "state_from": [
+    {
+      "src": "passage_sentences",
+      "key": "passage"
+    },
+    {
+      "src": "stem",
+      "key": "question"
+    },
+    {
+      "src": "blank_context",
+      "key": "blank_context",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ]
+    },
+    {
+      "src": "item",
+      "key": "options",
+      "default": {}
+    }
+  ],
+  "tables": {
+    "strategy": {
+      "vocab_fill": "选词填空：辨析近义词，看搭配与语境",
+      "sentence": "语句表达：语病、歧义、语气与结构",
+      "main_idea": "主旨概括：概括文段中心或作者意图",
+      "detail": "细节理解：定位文中具体信息",
+      "infer": "推断判断：依据文中信息作合理推断",
+      "logic": "逻辑判断：推理规则的运用",
+      "definition": "定义判断：严格依据给出的定义",
+      "analogy": "类比推理：词项间逻辑关系",
+      "number": "数字推理：数列规律",
+      "math": "数学运算：列式与计算",
+      "data": "资料分析：从图表或数据中提取与计算",
+      "common_sense": "常识判断：经济金融法律等常识",
+      "english": "英语单选：词汇、语法与搭配"
+    }
+  },
+  "judgments": [
+    {
+      "qkey": "strategy",
+      "type": "choice",
+      "step": "strategy",
+      "instructions": "@strategy",
+      "criteria": "tables.strategy",
+      "legend_key": "tables.strategy"
+    },
+    {
+      "qkey": "evidence",
+      "type": "choice",
+      "step": "evidence",
+      "instructions": "@evidence",
+      "candidates": {
+        "source": "sentences",
+        "clip": 240
+      },
+      "requires_state": "state.passage",
+      "legend_key": "sentences",
+      "display_clip": 320
+    },
+    {
+      "qkey": "best",
+      "type": "choice",
+      "step": "best",
+      "instructions": "@best",
+      "criteria": "options",
+      "legend_key": "options"
+    },
+    {
+      "qkey": "distractor",
+      "type": "choice",
+      "step": "distractor",
+      "instructions": "@distractor",
+      "criteria": "options"
+    },
+    {
+      "qkey": "support",
+      "type": "noul",
+      "step": "support",
+      "per_option": true,
+      "option_template": "@support",
+      "true": "@true",
+      "false": "@false"
+    }
+  ],
+  "variants": {
+    "strategy": [
+      {
+        "kinds": [],
+        "text": "这道题属于行测中的哪一类？依据 `state.question` 与材料判断。"
+      }
+    ],
+    "evidence": [
+      {
+        "kinds": [],
+        "text": {
+          "task": "哪一句是该题答案最直接的依据？只依据 `state.passage` 判断。",
+          "note": "若某句同时支持多个选项，选择对正确选项支持最直接、最不可替代的那一句。",
+          "question": "state.question"
+        }
+      }
+    ],
+    "best": [
+      {
+        "kinds": [],
+        "text": "依据 `state.passage`，选出 `state.question` 的最佳答案。"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "依据 `state.blank_context` 与 `state.passage`，选出最适合该空的选项。"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "依据 `state.blank_context` 与 `state.passage`，选出填入该空后使全文最连贯的选项。注意有两项为多余选项，均无法与该空衔接。"
+      }
+    ],
+    "distractor": [
+      {
+        "kinds": [],
+        "text": "哪个选项最具干扰性——看似正确，实则与 `state.passage` 不符或偷换了表述？"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "哪个选项最具干扰性——词形或词义相近，但填入后搭配或逻辑不妥？"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "哪个选项最具干扰性——看起来与上下文相关，但填入该空会造成逻辑或指代问题？"
+      }
+    ],
+    "support": [
+      {
+        "kinds": [],
+        "text": "依据 `state.passage`，选项 {L}（`state.options.{L}`）的内容是否得到原文支持？"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "选项 {L}（`state.options.{L}`）填入该空后，语义、搭配与上下文逻辑是否恰当？"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "选项 {L}（`state.options.{L}`）填入该空后，是否与上下文衔接自然、语义连贯？"
+      }
+    ],
+    "true": [
+      {
+        "kinds": [],
+        "text": "原文有明确依据，或可由原文直接推出"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "搭配自然、逻辑通顺，符合上下文语气"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "衔接自然：指代、逻辑与话题均与上下文一致"
+      }
+    ],
+    "false": [
+      {
+        "kinds": [],
+        "text": "原文无依据、与原文矛盾，或属于过度推断"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "搭配不当、语义矛盾，或与上下文逻辑不符"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "衔接生硬：话题跳脱、指代不明，或本身是多余选项"
+      }
+    ]
+  },
+  "steps": {
+    "strategy": {
+      "label": "题型识别",
+      "order": 0
+    },
+    "evidence": {
+      "label": "证据定位",
+      "sentence": true,
+      "order": 1
+    },
+    "support": {
+      "label": "逐选项支持度（每项一个独立判断）",
+      "order": 2
+    },
+    "best": {
+      "label": "最终判定",
+      "reveal": true,
+      "order": 3
+    },
+    "distractor": {
+      "label": "干扰项识别",
+      "order": 4
+    }
+  },
+  "rules": {
+    "base": "答案取「最终判定」中概率最高的选项。若该选项在「逐选项支持度」中不是最高，则两者结论不一致，标记为分歧需人工复核。",
+    "agree": "本题两路判断结论一致。",
+    "disagree": "本题「最终判定」选 {answer}，而「逐选项支持度」最高的是 {top}，存在分歧。",
+    "weak_single": "本题逐选项支持度普遍很低（最高仅 {pct}），说明没有哪个选项真正得到材料支持，通常意味着题目依赖的材料不在文本内；此时不宜采信答案。"
+  },
+  "hooks": [
+    "wrap_material_as_sentences"
+  ],
+  "kind_when": [
+    [
+      "选词填空",
+      "cloze"
+    ]
+  ]
+}

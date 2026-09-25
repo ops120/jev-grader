@@ -1,0 +1,243 @@
+{
+  "name": "english",
+  "display_name": "2025 年高考英语（全国卷）",
+  "compose_strategy": "single_choice_cross_check",
+  "answer_shape": "single",
+  "trace_fields": {},
+  "kind_default": "mcq",
+  "state_from": [
+    {
+      "src": "passage_sentences",
+      "key": "passage"
+    },
+    {
+      "src": "stem",
+      "key": "question"
+    },
+    {
+      "src": "blank_context",
+      "key": "blank_context",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ]
+    },
+    {
+      "src": "item",
+      "key": "options",
+      "default": {}
+    }
+  ],
+  "tables": {
+    "strategy": {
+      "by_kind": {
+        "cloze": {
+          "collocation": "固定搭配与惯用法",
+          "context_logic": "上下文逻辑：转折、因果、并列、递进",
+          "semantics": "词义辨析：近义词在语境中的取舍",
+          "grammar": "语法结构：时态、语态、非谓语、词性"
+        },
+        "seven": {
+          "topic_sentence": "主题句：概括该段或全文要点",
+          "transition": "承上启下：衔接前后段的过渡句",
+          "detail_support": "细节支撑：补充说明前文的具体信息",
+          "pronoun_reference": "指代衔接：与前后文人称/指代呼应",
+          "conclusion": "总结收束：对前文的归纳或展望"
+        }
+      },
+      "default": {
+        "detail": "细节理解：答案直接对应文中某一处事实或数据",
+        "inference": "推理判断：需依据文中信息作一步推断，文中无现成表述",
+        "main_idea": "主旨大意：概括段落或全文的中心、标题、写作目的",
+        "vocab": "词义猜测：依据上下文判断某个词或短语的含义",
+        "attitude": "观点态度：判断作者或文中人物的态度、评价",
+        "structure": "写作手法/篇章结构：如举例、引用、对比、数据说明"
+      }
+    }
+  },
+  "judgments": [
+    {
+      "qkey": "strategy",
+      "type": "choice",
+      "step": "strategy",
+      "instructions": "@strategy",
+      "criteria": "tables.strategy",
+      "legend_key": "tables.strategy"
+    },
+    {
+      "qkey": "evidence",
+      "type": "choice",
+      "step": "evidence",
+      "instructions": "@evidence",
+      "candidates": {
+        "source": "sentences",
+        "clip": 240
+      },
+      "requires_state": "state.passage",
+      "legend_key": "sentences",
+      "display_clip": 320
+    },
+    {
+      "qkey": "best",
+      "type": "choice",
+      "step": "best",
+      "instructions": "@best",
+      "criteria": "options",
+      "legend_key": "options"
+    },
+    {
+      "qkey": "distractor",
+      "type": "choice",
+      "step": "distractor",
+      "instructions": "@distractor",
+      "criteria": "options"
+    },
+    {
+      "qkey": "support",
+      "type": "noul",
+      "step": "support",
+      "per_option": true,
+      "option_template": "@support",
+      "true": "@true",
+      "false": "@false"
+    }
+  ],
+  "variants": {
+    "strategy": [
+      {
+        "kinds": [],
+        "text": "结合 `state.question` 与 `state.passage`，判断这道题考查的核心能力属于哪一类。"
+      }
+    ],
+    "evidence": [
+      {
+        "kinds": [],
+        "text": {
+          "task": "哪一句是该题答案最直接的依据？只依据 `state.passage` 判断。",
+          "note": "若某句同时支持多个选项，选择对正确选项支持最直接、最不可替代的那一句。",
+          "question": "state.question"
+        }
+      }
+    ],
+    "best": [
+      {
+        "kinds": [],
+        "text": "依据 `state.passage`，选出 `state.question` 的最佳答案。"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "依据 `state.blank_context` 与 `state.passage`，选出最适合该空的选项。"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "依据 `state.blank_context` 与 `state.passage`，选出填入该空后使全文最连贯的选项。注意有两项为多余选项，均无法与该空衔接。"
+      }
+    ],
+    "distractor": [
+      {
+        "kinds": [],
+        "text": "哪个选项最具干扰性——看似正确，实则与 `state.passage` 不符或偷换了表述？"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "哪个选项最具干扰性——词形或词义相近，但填入后搭配或逻辑不妥？"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "哪个选项最具干扰性——看起来与上下文相关，但填入该空会造成逻辑或指代问题？"
+      }
+    ],
+    "support": [
+      {
+        "kinds": [],
+        "text": "依据 `state.passage`，选项 {L}（`state.options.{L}`）的内容是否得到原文支持？"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "选项 {L}（`state.options.{L}`）填入该空后，语义、搭配与上下文逻辑是否恰当？"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "选项 {L}（`state.options.{L}`）填入该空后，是否与上下文衔接自然、语义连贯？"
+      }
+    ],
+    "true": [
+      {
+        "kinds": [],
+        "text": "原文有明确依据，或可由原文直接推出"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "搭配自然、逻辑通顺，符合上下文语气"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "衔接自然：指代、逻辑与话题均与上下文一致"
+      }
+    ],
+    "false": [
+      {
+        "kinds": [],
+        "text": "原文无依据、与原文矛盾，或属于过度推断"
+      },
+      {
+        "kinds": [
+          "cloze"
+        ],
+        "text": "搭配不当、语义矛盾，或与上下文逻辑不符"
+      },
+      {
+        "kinds": [
+          "seven"
+        ],
+        "text": "衔接生硬：话题跳脱、指代不明，或本身是多余选项"
+      }
+    ]
+  },
+  "steps": {
+    "strategy": {
+      "label": "题型识别",
+      "order": 0
+    },
+    "evidence": {
+      "label": "证据定位",
+      "sentence": true,
+      "order": 1
+    },
+    "support": {
+      "label": "逐选项支持度（每项一个独立判断）",
+      "order": 2
+    },
+    "best": {
+      "label": "最终判定",
+      "reveal": true,
+      "order": 3
+    },
+    "distractor": {
+      "label": "干扰项识别",
+      "order": 4
+    }
+  },
+  "rules": {
+    "base": "答案取「最终判定」中概率最高的选项。若该选项在「逐选项支持度」中不是最高，则两者结论不一致，标记为分歧需人工复核。",
+    "agree": "本题两路判断结论一致。",
+    "disagree": "本题「最终判定」选 {answer}，而「逐选项支持度」最高的是 {top}，存在分歧。",
+    "weak_single": "本题逐选项支持度普遍很低（最高仅 {pct}），说明没有哪个选项真正得到材料支持，通常意味着题目依赖的材料不在文本内；此时不宜采信答案。"
+  }
+}

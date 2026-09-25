@@ -1,0 +1,164 @@
+{
+  "name": "math",
+  "display_name": "2025 年高考数学（新Ⅰ卷·单选）",
+  "compose_strategy": "single_choice_with_trap",
+  "answer_shape": "single",
+  "trace_fields": {
+    "subject": "数学"
+  },
+  "kind_default": "math_single",
+  "covers_kinds": [
+    "math_single"
+  ],
+  "hooks": [
+    "math_answer_type"
+  ],
+  "state_from": [
+    {
+      "src": "item",
+      "key": "subject",
+      "default": "数学",
+      "flags": [
+        "if_nonempty"
+      ]
+    },
+    {
+      "src": "stem",
+      "key": "question"
+    },
+    {
+      "src": "item",
+      "key": "options",
+      "default": {}
+    },
+    {
+      "src": "item",
+      "key": "sub_questions",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ],
+      "from": "subs"
+    },
+    {
+      "src": "item",
+      "key": "table",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ]
+    },
+    {
+      "src": "item",
+      "key": "critical_values",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ],
+      "from": "crit_table"
+    },
+    {
+      "src": "item",
+      "key": "figures_not_provided",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ],
+      "from": "figures"
+    }
+  ],
+  "tables": {
+    "point": {
+      "set_logic": "集合与常用逻辑用语",
+      "complex": "复数",
+      "function": "函数与导数",
+      "trig": "三角函数与解三角形",
+      "sequence": "数列",
+      "solid": "立体几何",
+      "analytic": "平面解析几何",
+      "prob_stat": "概率与统计",
+      "vector": "平面向量与空间向量",
+      "inequality": "不等式"
+    },
+    "strategy": {
+      "direct": "直接计算：按定义或公式逐步算出结果",
+      "verify": "逐项验证：把选项代回题设检验",
+      "special": "特殊值/特殊情形代入，排除不可能项",
+      "graph": "数形结合：借助图象或几何直观",
+      "equiv": "等价转化：把条件变形为熟悉的形式",
+      "counter": "构造反例或反证"
+    }
+  },
+  "judgments": [
+    {
+      "qkey": "point",
+      "type": "choice",
+      "step": "point",
+      "instructions": "这道题主要考查 `state.question` 的哪个知识板块？",
+      "criteria": "tables.point",
+      "legend_key": "tables.point"
+    },
+    {
+      "qkey": "strategy",
+      "type": "choice",
+      "step": "strategy",
+      "instructions": "解决 `state.question` 最有效的方法是哪一种？",
+      "criteria": "tables.strategy",
+      "legend_key": "tables.strategy"
+    },
+    {
+      "qkey": "opt",
+      "type": "noul",
+      "step": "support",
+      "per_option": true,
+      "option_template": "选项 {L}（`state.options.{L}`）是否为 `state.question` 的正确答案？",
+      "true": "经计算或推理，该选项正确",
+      "false": "该选项错误或不满足题设",
+      "legend_key": "options"
+    },
+    {
+      "qkey": "best",
+      "type": "choice",
+      "step": "best",
+      "instructions": "依据 `state.question` 的条件逐步计算，选出唯一正确的选项。",
+      "criteria": "options"
+    },
+    {
+      "qkey": "trap",
+      "type": "choice",
+      "step": "trap",
+      "instructions": "哪个选项**不是正确选项**，却最可能因计算或概念失误被误选？",
+      "criteria": "options"
+    }
+  ],
+  "variants": {},
+  "steps": {
+    "point": {
+      "label": "考点识别",
+      "order": 0
+    },
+    "strategy": {
+      "label": "解法策略",
+      "order": 1
+    },
+    "support": {
+      "label": "逐选项判定（每项一个独立判断）",
+      "order": 2
+    },
+    "best": {
+      "label": "最终判定",
+      "reveal": true,
+      "order": 3
+    },
+    "trap": {
+      "label": "易错选项",
+      "order": 4
+    }
+  },
+  "rules": {
+    "base": "单选题：答案取「最终判定」概率最高的选项；若它与「逐选项判定」中概率最高的选项不一致，则标记为分歧。",
+    "agree": " 本题两路判断结论一致。",
+    "disagree": " 本题「最终判定」选 {answer}，而「逐选项判定」概率最高的是 {top}，存在分歧。",
+    "weak_single": " 本题最高概率仅 {pct}，说明模型对哪个选项都没把握——常见于题目依赖图形或条件超出其能力范围的情况，不宜采信。"
+  }
+}

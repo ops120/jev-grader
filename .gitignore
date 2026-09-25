@@ -1,0 +1,44 @@
+# ---------- 密钥：绝不入库 ----------
+.env
+.env.*
+!.env.example
+
+# ---------- 试卷原件（大体积二进制 + 版权归各自权利人） ----------
+*.pdf
+行招/
+行测真题试卷/
+
+# ---------- 解析中间产物（可由脚本重新生成） ----------
+data/_raw.txt
+data/math_pages/
+data/math_items/
+
+# ---------- 求解轨迹（调用 JEV 接口产生，重新求解需消耗配额） ----------
+data/traces/
+data/traces_math/
+data/traces_xc_*/
+data/traces_bank_*/
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# ---------- 编辑器 / 系统 ----------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# ---------- 题库与派生数据（题目内容版权归权利人，且本仓库不随仓库分发） ----------
+data/exam*.json
+data/math_verification.json
+data/_scratch/
+
+# ---------- 工作文档（不进公开仓库） ----------
+进展与TODO.md
+踩坑.md

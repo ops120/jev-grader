@@ -1,0 +1,162 @@
+{
+  "name": "math_multi",
+  "display_name": "2025 年高考数学（新Ⅰ卷·多选）",
+  "compose_strategy": "multi_threshold_set",
+  "answer_shape": "set",
+  "trace_fields": {
+    "subject": "数学"
+  },
+  "kind_default": "math_multi",
+  "covers_kinds": [
+    "math_multi"
+  ],
+  "hooks": [
+    "math_answer_type"
+  ],
+  "state_from": [
+    {
+      "src": "item",
+      "key": "subject",
+      "default": "数学",
+      "flags": [
+        "if_nonempty"
+      ]
+    },
+    {
+      "src": "stem",
+      "key": "question"
+    },
+    {
+      "src": "item",
+      "key": "options",
+      "default": {}
+    },
+    {
+      "src": "item",
+      "key": "sub_questions",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ],
+      "from": "subs"
+    },
+    {
+      "src": "item",
+      "key": "table",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ]
+    },
+    {
+      "src": "item",
+      "key": "critical_values",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ],
+      "from": "crit_table"
+    },
+    {
+      "src": "item",
+      "key": "figures_not_provided",
+      "flags": [
+        "optional",
+        "if_nonempty"
+      ],
+      "from": "figures"
+    }
+  ],
+  "tables": {
+    "point": {
+      "set_logic": "集合与常用逻辑用语",
+      "complex": "复数",
+      "function": "函数与导数",
+      "trig": "三角函数与解三角形",
+      "sequence": "数列",
+      "solid": "立体几何",
+      "analytic": "平面解析几何",
+      "prob_stat": "概率与统计",
+      "vector": "平面向量与空间向量",
+      "inequality": "不等式"
+    },
+    "strategy": {
+      "direct": "直接计算：按定义或公式逐步算出结果",
+      "verify": "逐项验证：把选项代回题设检验",
+      "special": "特殊值/特殊情形代入，排除不可能项",
+      "graph": "数形结合：借助图象或几何直观",
+      "equiv": "等价转化：把条件变形为熟悉的形式",
+      "counter": "构造反例或反证"
+    }
+  },
+  "judgments": [
+    {
+      "qkey": "point",
+      "type": "choice",
+      "step": "point",
+      "instructions": "这道题主要考查 `state.question` 的哪个知识板块？",
+      "criteria": "tables.point",
+      "legend_key": "tables.point"
+    },
+    {
+      "qkey": "strategy",
+      "type": "choice",
+      "step": "strategy",
+      "instructions": "解决 `state.question` 最有效的方法是哪一种？",
+      "criteria": "tables.strategy",
+      "legend_key": "tables.strategy"
+    },
+    {
+      "qkey": "opt",
+      "type": "noul",
+      "step": "support",
+      "per_option": true,
+      "option_template": "选项 {L}（`state.options.{L}`）这个结论本身是否成立？",
+      "true": "经推理或计算，该结论成立",
+      "false": "该结论不成立或无法推出",
+      "legend_key": "options"
+    },
+    {
+      "qkey": "count_hint",
+      "type": "choice",
+      "step": "count_hint",
+      "instructions": "本题的正确选项最可能共有几个？（仅用于交叉参考）",
+      "criteria": {
+        "1": "1 个正确选项",
+        "2": "2 个正确选项",
+        "3": "3 个正确选项",
+        "4": "4 个正确选项"
+      },
+      "desc_fmt": "模型认为最可能有 {choice} 个正确选项"
+    }
+  ],
+  "variants": {},
+  "steps": {
+    "point": {
+      "label": "考点识别",
+      "order": 0
+    },
+    "strategy": {
+      "label": "解法策略",
+      "order": 1
+    },
+    "support": {
+      "label": "逐选项判定（每项一个独立判断）",
+      "order": 2
+    },
+    "decide": {
+      "label": "阈值判定（代码决定：概率 ≥ 0.5 入选）",
+      "summary_fmt": "入选 {answer}",
+      "order": 3,
+      "reveal": true
+    },
+    "count_hint": {
+      "label": "正确选项个数（仅作参考）",
+      "order": 4
+    }
+  },
+  "rules": {
+    "base": "多选题：答案不是单个选项而是一个集合，故不使用选择判定，改为「逐选项判定」中概率 ≥ {threshold} 的选项全部入选（阈值由代码决定）。",
+    "weak_set": " 本题各选项概率集中在 0.5 附近，说明模型对哪个选项都没把握——常见于题目依赖图形或条件超出其能力范围的情况，不宜采信。"
+  }
+}
