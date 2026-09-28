@@ -1591,8 +1591,9 @@ function clearChrome() {
 const NEXT_STEPS = `
   <ol class="guide-steps">
     <li><a href="/api/template" download="bank_template.json">下载题库模板</a>
-      （或直接取仓库里的 <code>templates/bank_template.json</code>；
-      每个字段的说明见 <code>templates/README.md</code>）。</li>
+      （或直接取仓库里的 <code>templates/bank_template.json</code>）。
+      怎么填见 <code>templates/GUIDE.md</code>（手把手教程）与
+      <code>templates/README.md</code>（字段速查）。</li>
     <li>把题目按模板填成 JSON：题目（items）必须给 <code>stem</code> 与 <code>options</code>；
       阅读材料放进 <code>passages</code>；判定方式由 <code>meta.specs</code> 声明
       （english / xingce / math+math_multi）。</li>

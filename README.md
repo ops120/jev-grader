@@ -77,8 +77,9 @@ python tests/run_all.py       # 零配额门禁自检（不联网，不消耗额
 
 | 你想做的事 | 怎么做 |
 |---|---|
+| 第一次做题库 | [`templates/GUIDE.md`](templates/GUIDE.md)：手把手流程（准备材料 → 逐题型示例 → 上传排错表 → 自检清单） |
 | 拿到模板 | 工作台左栏「下载题库模板」，或直接看 [`templates/bank_template.json`](templates/bank_template.json)（原创演示题，可直接上传跑通） |
-| 看懂字段 | [`templates/README.md`](templates/README.md)：meta／sections／passages／items 每个字段、kind 一览、specs 怎么选 |
+| 查字段 | [`templates/README.md`](templates/README.md)：meta／sections／passages／items 每个字段、kind 一览、specs 怎么选 |
 | 上传 | 顶栏「上传题库」；或把 JSON 放进 `data/banks/`（文件名即试卷 id）；或 `POST /api/upload` |
 | 知道为什么被拒 | 结构验收不通过会**整体拒绝并逐条列出原因**（缺字段、坏选项字母、悬空篇章引用、kind 没有 spec 认领……） |
 | 知道题库干不干净 | 「答案汇总 → 题库体检」：校验记录、损失账目、可作答性逐条原因 |
