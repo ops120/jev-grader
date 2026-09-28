@@ -190,7 +190,7 @@ def main() -> int:
             print(f"  ----  {pid:<12} 题库读不出/不完整：{t['error']}")
             continue
         if not t["traces"] or not t["traces"].exists():
-            print(f"  SKIP  {pid:<12} 无轨迹目录，这道门禁未生效")
+            print(f"  ----  {pid:<12} 无轨迹目录（未求解过），该卷无从重放")
             continue
         n, ok, known, bad, detail = asyncio.run(
             run_paper(pid, t["specs"], t["envelope"], t["traces"]))
@@ -216,7 +216,7 @@ def main() -> int:
             print("  -", f)
         return 1
     if not total:
-        print("\n跳过：本机没有可重放的题库与轨迹，这道门禁未生效")
+        print("\nSKIP  本机没有可重放的题库与轨迹，这道门禁未生效（不是通过）")
         return 0
     print(f"\n通过：{total} 题走完 build -> ask -> compose -> 落盘 全路径；"
           f"{same} 题逐字段等于历史轨迹，{known_total} 题差异全部在台账内。"

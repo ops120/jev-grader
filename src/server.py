@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -28,7 +29,9 @@ from solver import load_exam, solve_one  # noqa: E402
 
 WEB = ROOT / "web"
 TEMPLATE = ROOT / "templates" / "bank_template.json"
-HOST, PORT = "127.0.0.1", 8848
+# 默认只监听本机：这是个没有鉴权的本机工具（见 SECURITY.md）。端口可用环境变量覆盖。
+HOST = os.environ.get("JEV_GRADER_HOST", "127.0.0.1")
+PORT = int(os.environ.get("JEV_GRADER_PORT", "8848"))
 
 app = FastAPI(title="JEV 智能改卷系统")
 

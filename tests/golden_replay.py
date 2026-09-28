@@ -58,10 +58,12 @@ def main() -> int:
             else:
                 bad.append(f"{pid}/{item['id']}")
         total += n_item
-        compared += n_have
-        if not n_item:
-            print(f"  ----  {pid:<12} 没有可作答题，无历史请求可比对")
+        if not n_item or not n_have:
+            # 0/0 不是通过：本卷没有历史轨迹可对拍，如实记为未生效，不计入覆盖面
+            print(f"  ----  {pid:<12} {'没有可作答题' if not n_item else '无历史轨迹（未求解过）'}"
+                  f"，{n_item} 道可作答题无从对拍")
             continue
+        compared += n_have
         print(f"  {'OK  ' if n_ok == n_have else 'FAIL'}  {pid:<12} {n_ok}/{n_have} 题与历史请求一致"
               f"（可作答题 {n_item}）")
 
@@ -69,7 +71,7 @@ def main() -> int:
         print(f"\n与历史真实请求不一致的题（{len(bad)}）：{bad[:20]}{' …' if len(bad) > 20 else ''}")
         return 1
     if not compared:
-        print("\n跳过：本机题库尚无历史轨迹（未求解过），这道门禁未生效")
+        print("\nSKIP  本机题库均无历史轨迹，这道门禁未生效（不是通过）")
         return 0
     if compared < total:
         print(f"\n通过，但只有 {compared}/{total} 题有历史轨迹可比对")
