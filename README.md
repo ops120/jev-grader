@@ -2,9 +2,7 @@
 
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-<!-- 推送到 GitHub 后，把下面两行的 OWNER/REPO 换成你的仓库，即可显示 CI 徽章：
-[![tests](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
--->
+[![tests](https://github.com/ops120/jev-grader/actions/workflows/ci.yml/badge.svg)](https://github.com/ops120/jev-grader/actions/workflows/ci.yml)
 
 > ⚠️ **本项目只做改卷工作台，不做试卷提取**
 >
