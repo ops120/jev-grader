@@ -1,0 +1,29 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      # 零配额门禁：不联网、不消耗 JEV 配额。
+      # 本仓库不分发题库与求解轨迹（版权 + 本机数据），因此需要历史轨迹的两道门禁
+      # （golden_replay / test_solver_replay）会打印 SKIP —— 那不是通过，是未生效；
+      # 其余五道（compose 对拍、判定契约、缓存身份、题库构造层、上传管线）在干净
+      # clone 上全部真实生效。
+      - name: 零配额门禁
+        run: python tests/run_all.py

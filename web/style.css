@@ -634,3 +634,14 @@ table.sum tr.is-wrong:hover td{background:var(--bad-2)}
   line-height:1.6; white-space:pre-wrap; background:var(--panel-2);
   border:1px solid var(--line); border-radius:8px; padding:10px; color:var(--ink-2);
 }
+
+/* ---------- 上传题库：结构验收失败清单 ---------- */
+.upload-errors{
+  margin:9px 0 0; padding-left:19px; max-height:42vh; overflow:auto;
+  font-size:12.5px; line-height:1.6; color:var(--ink-2);
+}
+.upload-errors li{margin:4px 0}
+.upload-errors code{
+  font-family:var(--mono); font-size:10.5px; color:var(--bad);
+  background:var(--bad-2); border-radius:4px; padding:1px 5px;
+}

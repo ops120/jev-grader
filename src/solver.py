@@ -27,7 +27,7 @@ CONCURRENCY = 4
 def load_exam(paper_id: str | None) -> dict:
     cfg = papers.get(paper_id)
     if not cfg["exam"].exists():
-        sys.exit(f"缺少 {cfg['exam']}，请先运行解析脚本")
+        sys.exit(f"缺少 {cfg['exam']}，请重新上传题库（或把文件放回 data/banks/）")
     try:
         return bank.read_bank(cfg["exam"])
     except bank.BankVersionError as e:
@@ -87,7 +87,7 @@ async def solve_one(client: JevClient, item: dict, passage: dict | None,
 
 async def main() -> None:
     argv = sys.argv[1:]
-    paper_id = papers.DEFAULT
+    paper_id = None
     if "--paper" in argv:
         i = argv.index("--paper")
         paper_id = argv[i + 1]
@@ -95,7 +95,11 @@ async def main() -> None:
     force = "--force" in argv
     args = [a for a in argv if not a.startswith("-")]
 
-    cfg = papers.get(paper_id)
+    try:
+        cfg = papers.get(paper_id)
+    except KeyError:
+        sys.exit("data/banks/ 里没有任何题库：请按 templates/ 模板制作题库并通过"
+                 "工作台上传（或直接把题库 JSON 放进 data/banks/）")
     exam = load_exam(paper_id)
     # 开跑前先把 spec 全部加载：spec 写错要在烧配额之前报错，而不是跑到第一题才炸
     for _spec_name in cfg["specs"]:

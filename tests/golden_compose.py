@@ -17,7 +17,10 @@ D  步骤形态：产出的步骤键序列必须仍是重构前实测存在的�
 
 跑法：python tests/golden_compose.py     退出码 0 = 等价
 
-合成响应用固定随机种子，不联网、不消耗配额。缺题库时跳过并说明跳过了什么。
+目标 = 本机 data/banks/ 里的题库（逐个列出，读不出的带原因 SKIP 而不是静默略过）
+     + 随仓库分发的模板卷 templates/bank_template.json（走生产上传管线取信封，
+       所以这道门禁在任何机器上都真实生效，不会集体 SKIP）。
+合成响应用固定随机种子，不联网、不消耗配额。
 """
 from __future__ import annotations
 
@@ -29,7 +32,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-import papers  # noqa: E402
 from judge import _legacy, engine, spec as spec_mod, strategies  # noqa: E402
 from judge.orchestrators import ORCHESTRATORS  # noqa: E402
 
@@ -62,10 +64,11 @@ def unexpected_shapes(shapes: set) -> list:
     return sorted(s for s in shapes if not any(is_subsequence(s, f) for f in EXPECTED_SHAPES))
 
 
-# 迁移期对照表：试卷 id -> S0 编排名。papers.py 在 S3 已改指 spec，这张表只活在门禁里，
-# 因为它的唯一作用是让"新旧等价"这句断言始终有一个不被 spec 影响的参照系。
-LEGACY = {"english": "questions", "math": "questions_math",
-          "xc_fs": "questions_cn", "xc_ds": "questions_cn", "xc_zf": "questions_cn"}
+# spec 名 -> S0 编排名。S0 时代只有三套编排：英语（questions）、行测等中文卷
+# （questions_cn）、数学（questions_math）。S0 之后新增的 spec 没有重构前的
+# 对照副本——它们该跳过并说明，而不是把门禁打红。
+LEGACY = {"english": "questions", "xingce": "questions_cn",
+          "math": "questions_math", "math_multi": "questions_math"}
 
 LEGACY_COMPOSE = {"questions": _legacy.compose,
                   "questions_cn": _legacy.compose,
@@ -216,64 +219,57 @@ def check_compose(bank: dict, org: str, spec_names: tuple, passages: dict,
     return n_items, n_cases, errs, shapes
 
 
-SPECS_FOR: dict[str, str] = {}  # spec 名 -> 旧编排名，main 里按 papers 注册表填
-
-
 def main() -> int:
-    # S0 对拍只覆盖 S0 时代就存在的五份卷。S0 之后新注册的卷（README 明文支持的
-    # 「接入新卷」路径）天生没有重构前的对照副本——它们该跳过，而不是把门禁打红。
-    post_s0 = [pid for pid in papers.PAPERS if pid not in LEGACY]
-    if post_s0:
-        print(f"  NOTE  以下试卷为 S0 之后注册，无重构前对照副本，不参与本道对拍：{post_s0}")
-    for pid, cfg in papers.PAPERS.items():
-        if pid not in LEGACY:
-            continue
-        for name in cfg["specs"]:
-            SPECS_FOR.setdefault(name, LEGACY[pid])
-    specs = {s.name: s for s in spec_mod.load_all().values()}
-    missing = set(SPECS_FOR) - set(specs)
-    if missing:
-        print(f"FAIL  以下 spec 不存在：{sorted(missing)}")
-        return 1
-
+    from _targets import all_targets       # tests/ 同目录
     rng = random.Random(20260924)
     build_total = case_total = 0
     seen_shapes: set[tuple] = set()
     failures: list[str] = []
-    for pid, cfg in papers.PAPERS.items():
-        if pid not in LEGACY:
-            continue                      # S0 之后注册的卷：无对照副本，见 main 开头的 NOTE
-        if not cfg["exam"].exists():
-            print(f"  SKIP  {pid:<8} 题库缺失，此门禁未生效")
+    ran = 0
+    for t in all_targets():                # 本机题库 + 随仓库分发的模板卷
+        pid = t["id"]
+        if t["error"]:
+            print(f"  SKIP  {pid:<12} 题库读不出：{t['error']}")
             continue
-        bank = json.loads(cfg["exam"].read_text(encoding="utf-8"))
-        passages = {p["id"]: p for p in bank.get("passages", [])}
-        org = LEGACY[pid]
-        nb, eb = check_build(bank, cfg["specs"], passages, org)
-        ni, nc, ec, shapes = check_compose(bank, org, cfg["specs"], passages, rng)
+        unknown = [s for s in t["specs"] if s not in LEGACY]
+        orgs = {LEGACY[s] for s in t["specs"] if s in LEGACY}
+        if unknown or len(orgs) != 1:
+            print(f"  NOTE  {pid:<12} specs={sorted(t['specs'])} 含 S0 之后新增/未知 spec，"
+                  f"无重构前对照副本，不参与本道对拍")
+            continue
+        org = orgs.pop()
+        for name in t["specs"]:
+            if spec_mod.get(name).compose_strategy not in strategies.STRATEGIES:
+                failures.append(f"spec {name} 指向未知组合策略")
+        env = t["envelope"]
+        data = {"items": env["items"], "passages": env.get("passages") or []}
+        passages = {p["id"]: p for p in data["passages"]}
+        nb, eb = check_build(data, t["specs"], passages, org)
+        ni, nc, ec, shapes = check_compose(data, org, t["specs"], passages, rng)
         seen_shapes |= shapes
         build_total += nb
         case_total += nc
+        ran += 1
         status = "OK  " if not (eb or ec) else "FAIL"
-        print(f"  {status}  {pid:<8} build {nb} 题等价 · compose {ni} 题 × {nc} 组合成响应")
+        print(f"  {status}  {pid:<12} build {nb} 题等价 · compose {ni} 题 × {nc} 组合成响应")
         failures += [f"{pid}/build {m}" for m in eb[:5]]
         failures += [f"{pid}/compose {m}" for m in ec[:5]]
 
-    for name, org in SPECS_FOR.items():
-        if spec_mod.get(name).compose_strategy not in strategies.STRATEGIES:
-            failures.append(f"spec {name} 指向未知组合策略")
     bad_shapes = unexpected_shapes(seen_shapes)
     if bad_shapes:
         failures.append(f"出现重构前不存在的步骤（或顺序变了）：{bad_shapes}")
     full_seen = {s for s in seen_shapes if s in EXPECTED_SHAPES}
     if build_total and full_seen != EXPECTED_SHAPES and not failures:
-        print(f"  提示：本次未覆盖到全形 {sorted(EXPECTED_SHAPES - full_seen)}"
-              f"（对应题库缺失？）")
+        print(f"  提示：本次覆盖到的全形 {sorted(full_seen)}；未覆盖 "
+              f"{sorted(EXPECTED_SHAPES - full_seen)}（对应科目的题库不在本机，属正常）")
 
     if failures:
         print("\nspec/策略与重构前不等价（这是硬失败，禁止改基线绕过）：")
         for f in failures[:30]:
             print("  -", f)
+        return 1
+    if not ran:
+        print("\n没有可作为对拍目标的题库（模板卷也读不出？），这道门禁未生效")
         return 1
     print(f"\n通过：{build_total} 题 build 逐字节等价；"
           f"compose 在 {case_total} 组合成响应上与冻结副本等价，"

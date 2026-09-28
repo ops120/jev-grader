@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "title": "模板示例卷（原创演示题）",
+    "subject": "示例",
+    "specs": ["english"],
+    "has_latex": false,
+    "paper_note": "本卷随仓库分发，题目为原创示例，仅演示模板结构；上传后即可求解与改卷。"
+  },
+  "sections": [
+    { "name": "阅读理解", "part": "一", "per": 2, "count": 2 },
+    { "name": "完形填空", "part": "二", "per": 2, "count": 1 },
+    { "name": "语言运用", "part": "三", "per": 2, "count": 3 }
+  ],
+  "passages": [
+    {
+      "id": "P1",
+      "label": "Passage One",
+      "paragraphs": [
+        "For thirty years, Mr. Bell kept a small bookshop at the corner of Willow Street. He opened the door at eight every morning, watered the two pots of mint by the window, and read the new arrivals before anyone else did.",
+        "Regulars say he never refused a customer who had no money with him. \"Take the book now,\" he would say. \"Pay me when the story is worth the price.\" Most people paid twice."
+      ]
+    },
+    {
+      "id": "P2",
+      "label": "Passage Two",
+      "paragraphs": [
+        "City parks have not always been parks. Most of them began as parking lots or empty yards, and few people believed they could be turned into green space. [3]____ , in one small town, a group of neighbors spent two years cleaning the lots, planting trees and persuading the city to close the street to cars. Their garden is now the quietest place downtown."
+      ]
+    }
+  ],
+  "items": [
+    {
+      "no": 1, "part": "一", "section": "阅读理解", "kind": "mcq",
+      "passage": "P1", "answer": "B", "score": 2,
+      "stem": "What did Mr. Bell do first after opening his bookshop each morning?",
+      "options": {
+        "A": "He dusted the shelves.",
+        "B": "He watered the plants by the window.",
+        "C": "He greeted the regular customers.",
+        "D": "He priced the new arrivals."
+      }
+    },
+    {
+      "no": 2, "part": "一", "section": "阅读理解", "kind": "mcq",
+      "passage": "P1", "answer": "B", "score": 2,
+      "stem": "What can be inferred about Mr. Bell from the passage?",
+      "options": {
+        "A": "He ran the bookshop mainly to get rich.",
+        "B": "He trusted his customers more than he relied on rules.",
+        "C": "He refused to sell books to strangers.",
+        "D": "He seldom read the books he sold."
+      }
+    },
+    {
+      "no": 3, "part": "二", "section": "完形填空", "kind": "cloze",
+      "passage": "P2", "answer": "A", "score": 2,
+      "stem": "Choose the best word for blank [3] in Passage Two.",
+      "options": {
+        "A": "However",
+        "B": "Therefore",
+        "C": "Instead",
+        "D": "Otherwise"
+      }
+    },
+    {
+      "no": 4, "part": "三", "section": "语言运用", "kind": "mcq",
+      "answer": "D", "score": 2,
+      "stem": "Which of the following sentences is correct?",
+      "options": {
+        "A": "He suggested to go out for a walk.",
+        "B": "She has been to Paris last year.",
+        "C": "The number of students are increasing.",
+        "D": "Neither of the answers is right."
+      }
+    },
+    {
+      "no": 5, "part": "三", "section": "语言运用", "kind": "judge",
+      "answer": "A", "score": 2,
+      "stem": "判断：「画蛇添足」比喻做了多余的事，反而不恰当。",
+      "options": {
+        "A": "正确",
+        "B": "错误"
+      }
+    },
+    {
+      "no": 6, "part": "三", "section": "语言运用", "kind": "listening", "score": 2,
+      "stem": "听录音，选出对话发生的地点。（本卷不含录音原文，本题不可作答）",
+      "options": {
+        "A": "At the station.",
+        "B": "At the library.",
+        "C": "At the hotel.",
+        "D": "At the airport."
+      }
+    }
+  ]
+}

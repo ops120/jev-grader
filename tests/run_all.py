@@ -3,17 +3,17 @@
 跑法：python tests/run_all.py        退出码 0 = 全绿
 
 每道门禁各管一段，缺一不可：
-  golden_build        发给 JEV 的载荷与 S0 基线哈希一致（最强，且不依赖任何轨迹文件）
-  golden_replay       今天重建的载荷与历史上真实发过的那次逐字节一致
-  golden_compose      spec + 命名策略与重构前的两份 S0 副本等价
+  golden_compose      spec + 命名策略与重构前的两份 S0 副本等价（目标＝本机题库
+                      + 随仓库分发的模板卷，任何机器上都真实生效）
   test_judge_contract 作为参照系的 S0 副本自身没被"顺手修一下"
-  test_solver_replay  build -> ask -> compose -> 落盘 整条生产接线重放
   test_cache_identity 缓存按内容认领：题库重编号后不把别的题的判定当本题答案
-  test_bank           题库构造层 bank.py 的纯函数测试（唯一不需要题库文件的门禁，
-                      所以也是新 clone 的机器上唯一真实生效的那道）
-  test_extract        抽取层（probe 定位 + 纯代码验收）的 fixture 测试，同样不需要题库文件
+  golden_replay       今天重建的载荷与历史上真实发过的那次逐字节一致（需本机轨迹）
+  test_solver_replay  build -> ask -> compose -> 落盘 整条生产接线重放（需本机轨迹）
+  test_bank           题库构造层 bank.py 的纯函数测试（不需要题库文件）
+  test_upload         上传管线：模板契约、结构验收、归一化（不需要题库文件）
 
-题库不入库，所以在没有题库的机器上多数门禁会打印 SKIP：那不是通过，是未生效。
+题库不再随仓库分发（改由用户按 templates/ 模板上传），所以需要历史轨迹的
+两道门禁在没有本地数据的机器上会打印 SKIP：那不是通过，是未生效。
 本脚本如实把 skipped 数带进汇总，禁止把"跳过"读成"安全"。
 """
 from __future__ import annotations
@@ -23,9 +23,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-GATES = ["golden_build.py", "golden_replay.py", "golden_compose.py",
-         "test_judge_contract.py", "test_solver_replay.py", "test_cache_identity.py",
-         "test_bank.py", "test_extract.py"]
+GATES = ["golden_compose.py", "test_judge_contract.py", "test_cache_identity.py",
+         "golden_replay.py", "test_solver_replay.py", "test_bank.py", "test_upload.py"]
 
 
 def main() -> int:

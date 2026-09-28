@@ -1,11 +1,5 @@
 # 解析与求解
-PyMuPDF==1.27.1          # PDF 文本层与版面抽取、页面渲染
 httpx==0.28.1            # 调用 JEV HTTP 接口（异步 + 重试）
 fastapi==0.135.1         # 工作台服务端
 uvicorn==0.41.0          # ASGI 服务器
 pydantic==2.12.3         # FastAPI 依赖
-pillow==12.3.0           # 生成公众号首图
-
-# 数学卷独立核对（src/verify_math.py）
-sympy==1.14.0
-numpy==2.2.6

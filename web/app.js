@@ -187,15 +187,15 @@ function renderStats() {
   const cmp = items.filter((i) => keyOf(i) && traceOf(i.no));
   const hitN = cmp.filter((i) => normCompare(traceOf(i.no).answer) === normCompare(keyOf(i))).length;
 
-  // 题库核验状态：verified 只能由外部独立核验（extract/verify.py）置位。
-  // 界面必须如实亮出「未核验」——不能让没核验的题库看起来像核验过的。
+  // 题库核验状态：verified 只能由外部核验流程置位。本项目不做提取，
+  // 上传题库的「题面是否与原件一致」没有物证可查，界面必须如实亮出「未核验」。
   const bm = state.exam.meta || {};
-  const vblockers = (bm.verified_blockers || []).filter((b) => !/独立核验/.test(b));
+  const vblockers = (bm.verified_blockers || []).filter((b) => !/核验/.test(b));
   const cells = [
     bm.verified === true
-      ? { n: '已核验', l: '题库独立核验', cls: 'is-ok', t: '该题库已通过独立核验（extract/verify.py）' }
+      ? { n: '已核验', l: '题库独立核验', cls: 'is-ok', t: '该题库带有独立核验记录' }
       : { n: '未核验', l: '题库独立核验', cls: 'is-action',
-          t: vblockers.length ? `尚未通过独立核验：${vblockers.join('；')}` : '尚未经过独立核验（extract/verify.py）' },
+          t: vblockers.length ? `尚未通过独立核验：${vblockers.join('；')}` : '题面内容未经独立核验（上传题库的常态，不影响改卷）' },
     { n: answerable.length, l: '可作答题目' },
     { n: `${solved.length}/${answerable.length}`, l: '已求解', cls: solved.length === answerable.length ? 'is-ok' : '' },
     { n: by.warn, l: '依据薄弱', cls: by.warn ? 'is-bad' : 'is-ok' },
@@ -1435,6 +1435,53 @@ async function clearTraces(nos) {
   }
 }
 
+/* ---------- 上传题库 ---------- */
+async function uploadBank(name, bankObj) {
+  const btn = $('btn-upload');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.innerHTML = '<span class="spin"></span>校验中…';
+  try {
+    const r = await fetch('/api/upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, bank: bankObj }),
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) {
+      if (data && Array.isArray(data.errors) && data.errors.length) {
+        return showUploadErrors(data.errors);
+      }
+      throw new Error((data && data.detail) || `HTTP ${r.status}`);
+    }
+    state.papers = await fetchPapers();
+    renderPaperSwitch();
+    toast(`已导入「${data.title}」：${data.total_items} 题，可作答 ${data.answerable} 题`
+      + (data.replaced ? '（替换同名题库）' : '')
+      + (data.warnings && data.warnings.length
+        ? `；${data.warnings.length} 条告警见「答案汇总 → 题库体检」` : ''));
+    await loadPaper(data.paper);
+  } catch (e) {
+    toast(`上传失败：${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+/** 上传被拒：error 逐条展示（复用确认弹窗），绝不静默成一句「失败」。 */
+function showUploadErrors(errors) {
+  $('confirm-title').textContent = '题库未通过结构验收';
+  $('confirm-body').innerHTML = `
+    <p>这份题库存在下列错误，<b>整体未入库</b>。修正后重新上传即可：</p>
+    <ul class="upload-errors">${errors.map((e) =>
+      `<li><code>${esc(e.code)}</code>　${esc(e.message || e.detail || '')}</li>`).join('')}</ul>`;
+  $('confirm-foot').innerHTML = `<button class="btn" data-act="cancel">关闭</button>`;
+  $('confirm').hidden = false;
+  $('confirm-foot').querySelectorAll('button').forEach((b) =>
+    b.addEventListener('click', closeConfirm));
+}
+
 /* ---------- 求解 ---------- */
 async function solve(nos) {
   if (state.busy || !state.exam) return;
@@ -1523,8 +1570,8 @@ function renderPaperSwitch() {
   if (!state.papers.length) { sw.innerHTML = ''; return; }
   sw.innerHTML = state.papers.map((p) => `
     <button data-paper="${p.id}" class="${p.id === state.paper ? 'on' : ''}"
-            title="${esc(p.title || p.id)}${p.exam_ready === false ? '（题库文件缺失）' : ''}">${
-              esc(p.subject || p.id)}<em>${p.solved}${p.exam_ready === false ? ' ·缺' : ''}</em></button>`).join('');
+            title="${esc(p.title || p.id)}${p.exam_ready === false ? `（${esc(p.error || '题库不可用')}）` : ''}">${
+              esc(p.subject || p.id)}<em>${p.solved}${p.exam_ready === false ? ' ·异常' : ''}</em></button>`).join('');
   sw.querySelectorAll('button').forEach((b) =>
     b.addEventListener('click', () => {
       if (b.dataset.paper !== state.paper) loadPaper(b.dataset.paper);
@@ -1543,14 +1590,16 @@ function clearChrome() {
 
 const NEXT_STEPS = `
   <ol class="guide-steps">
-    <li>把试卷 PDF 放进仓库（例如 <code>assets/&lt;科目&gt;.pdf</code>）。</li>
-    <li>在 <code>src/papers.py</code> 注册这份题库：给出 <code>id</code>、<code>subject</code>、
-      <code>title</code>、抽取产物路径 <code>exam</code>、轨迹目录 <code>traces</code>
-      与判定 <code>specs</code>（指向 <code>src/judge/specs/*.json</code>，按题目 kind 选一份）；
-      含公式的科目要写 <code>has_latex: True</code>。判据表与措辞不同的新科目要另写一份 spec。</li>
-    <li>运行该科目的抽取脚本生成 <code>data/exam_&lt;科目&gt;.json</code>
-      （题目需带 <code>no</code> / <code>stem</code> / <code>options</code> / <code>answerable</code>）。</li>
-    <li>人工核对抽取结果与原题一致——题面错一行，判定就错一题；核对完再点「求解全卷」。</li>
+    <li><a href="/api/template" download="bank_template.json">下载题库模板</a>
+      （或直接取仓库里的 <code>templates/bank_template.json</code>；
+      每个字段的说明见 <code>templates/README.md</code>）。</li>
+    <li>把题目按模板填成 JSON：题目（items）必须给 <code>stem</code> 与 <code>options</code>；
+      阅读材料放进 <code>passages</code>；判定方式由 <code>meta.specs</code> 声明
+      （english / xingce / math+math_multi）。</li>
+    <li>顶栏「上传题库」选择该文件，或把它放进 <code>data/banks/</code>（文件名即试卷 id）。
+      结构验收不过会逐条给出原因；通过后刷新即出现在顶栏。</li>
+    <li>人工核对题面内容与原卷一致——验收器只查结构，查不出「抄错题面」；
+      题面错一行，改卷就错一题。核对完再点「求解全卷」。</li>
   </ol>`;
 
 /** 分不出种类的加载错误也不许含糊：说清楚是哪一步、哪个接口、返回了什么。 */
@@ -1564,10 +1613,12 @@ function renderEmptyState(paperId, err) {
   else if (kind === 'unknown' && status === 503) kind = 'missing';
 
   const head = {
-    nobank: ['仓库里还没有任何题库', '本仓库不含题库数据：/api/papers 返回空列表。工作台是空的，不是坏了。'],
+    nobank: ['仓库里还没有任何题库', '本仓库不做试卷提取：按 templates/ 模板制作题库 JSON 并上传，工作台才有卷可改。'],
     unregistered: [`没有 id 为 ${esc(paperId)} 的题库`, '地址栏指定的题库不在注册表里，因此这里没有可显示的内容——不会回退到别的题库。'],
-    missing: [`题库 ${esc(paperId)} 已注册，但抽取产物缺失`, '服务端答了 503：配置文件指向的题目 JSON 还不存在，需要先跑抽取。'],
-    malformed: [`题库 ${esc(paperId)} 内容不合法`, '文件在，但读不出题目——问题出在抽取产物本身，不是加载器。'],
+    missing: [`题库 ${esc(paperId)} 已注册，但读不出来`,
+      entry && entry.error ? `原因：${esc(entry.error)}`
+        : '注册表指向的题库 JSON 不存在——请重新上传，或把文件放回 data/banks/。'],
+    malformed: [`题库 ${esc(paperId)} 内容不合法`, '文件在，但读不出题目——问题出在题库文件本身，不是加载器。'],
     unknown: ['无法读取题库', '接口没有给出可辨识的原因，按下面的顺序自查。'],
   }[kind];
 
@@ -1616,7 +1667,7 @@ async function loadPaper(paperId) {
     if (!items.length) {
       throw Object.assign(new Error(
         `题库已注册但内容为空：${paperId} 的 items 为 0 条。`
-        + '这不是加载器的问题——请检查抽取产物的题目数组。'), { kind: 'malformed' });
+        + '这不是加载器的问题——请检查题库文件的题目数组。'), { kind: 'malformed' });
     }
     // 兜底信号：题库清单没声明 has_latex 时，按卷内是否真的出现 $...$ 判断
     if (!paperHasLatex()) {
@@ -1719,6 +1770,19 @@ async function boot() {
 function bindChrome() {
   $('btn-collapse').addEventListener('click', () => setCollapsed(true));
   $('answer-strip').addEventListener('click', () => setCollapsed(false));
+  $('btn-upload').addEventListener('click', () => $('file-upload').click());
+  $('file-upload').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    let bankObj;
+    try { bankObj = JSON.parse(await f.text()); }
+    catch (err) { return toast(`文件不是合法 JSON：${err.message}`); }
+    if (!bankObj || typeof bankObj !== 'object' || Array.isArray(bankObj)) {
+      return toast('题库顶层必须是 JSON 对象（含 meta 与 items）');
+    }
+    uploadBank(f.name, bankObj);
+  });
   $('btn-summary').addEventListener('click', () => { if (state.exam) openSummary(); });
   $('btn-close').addEventListener('click', closeSummary);
   $('modal-mask').addEventListener('click', closeSummary);

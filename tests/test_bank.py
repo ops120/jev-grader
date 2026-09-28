@@ -1,20 +1,19 @@
-"""门禁 7：题库构造层 bank.py 的纯函数测试。
+"""门禁：题库构造层 bank.py 的纯函数测试。
 
-为什么单独钉这一层：五份题库现在**只有 bank.py 一个构造器**，
-"答案可被质疑和复核" 这句话的全部技术含量都落在这里的十几个函数上。
-它是纯函数，不需要任何题库文件就能跑 —— 所以在"仓库不含题库"的机器上
-这道门禁依然真实生效（别处那些门禁只能打 SKIP）。
+为什么单独钉这一层：题库现在**只有 bank.py 一个信封构造器**（上传管线
+src/upload.py 也把归一化结果交给它），"答案可被质疑和复核" 这句话的全部技术含量
+都落在这里的十几个函数上。它是纯函数，不需要任何题库文件就能跑 —— 所以在
+"仓库不含题库"的机器上这道门禁依然真实生效（别处那些门禁只能打 SKIP）。
 
 钉住的行为，逐条对应旧代码的真实缺陷：
-  align_runs      双向局部对齐：编造要抓到、漏抄要抓到；并钉住它已知的限度
-                  （单字替换在 min_len=2 下不可见 —— 这是限度不是 bug，但必须写出来）
+  make_passage/split_sentences  上传题库的篇章由此构造：逐句编号、题空登记、缩写不误切
   complete_item   缺损题**永不丢弃**；reason_override 与 domain_reason 不得混用
   renumber        卷面号留在 printed_no，内部号连续，重复号入账且不截断
   build_loss      见过的号 - 保留的号 - 显式 drop 的号 = never_parsed（静默丢题的会计式）
   validation      ids 永不截断（旧代码用 missing[:3] 让 JSON 系统性低估自己的失败面）
   render_valid.   未登记的 code 必须抛，报告里不允许出现无记录支撑的自由文本
   read_bank       读到 v1 / 无版本号的旧题库直接拒，不做字段猜测式兼容
-  apply_verified  有 error、有未入账损失、缺独立核验 → 不允许 verified
+  apply_verified  有 error、有未入账损失、缺核验 → 不允许 verified
 
 跑法：python tests/test_bank.py     退出码 0 = 全绿
 """
@@ -54,90 +53,33 @@ def limit(name: str, note: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-def run_align() -> None:
-    print("\n--- align_runs：双向局部对齐 ---")
+def run_text() -> None:
+    print("\n--- 文本工具：篇章构造与切句（上传题库的 passages 由此产出） ---")
 
-    # 回归用例：归一化会把成串符号塌成同一个 '#'（公式密集处极常见）。
-    # 等值段中间仍然可能是唯一可用的对齐起点，旧实现用"跳过相邻等值令牌"的跳转表
-    # 直接跳过了它，于是整段转写都被报成"原文里没有"——假编造告警。
-    # 旧实现在这个用例上得到 extra=[('#@',0,2)]（把整条转写报成编造），
-    # 新实现把 ',b' 全部配上，只报原文真正多出来的部分。
-    extra, missing = bank.align_runs(",b", "a,,,bc", min_len=2)
-    check("等值段内的对齐起点不被跳过（跳转表回归：整段转写不再被误报为编造）",
-          extra == [] and [(r["text"], r["len"]) for r in missing] == [("@##", 3)],
-          f"转写 ',b' 是原文 'a,,,bc' 的子集，extra 应为空；实得 extra={extra} missing={missing}")
+    p = bank.make_passage("P1", "Passage One",
+                          ["First sentence. Second sentence!", "Third one?"])
+    check("逐句编号 S1..Sn",
+          [s["no"] for s in p["sentences"]] == ["S1", "S2", "S3"],
+          f"实得 {[s['no'] for s in p['sentences']]}")
+    check("段落原样保留（供界面展示）",
+          p["paragraphs"] == ["First sentence. Second sentence!", "Third one?"],
+          f"实得 {p['paragraphs']}")
+    check("空篇章不产出句子（不臆造内容）",
+          bank.make_passage("P0", None, [])["sentences"] == [], "空输入必须给空结果")
 
-    # 镜像：等值段出现在转写侧
-    extra, missing = bank.align_runs("a,,,bc", ",b", min_len=2)
-    check("等值段出现在转写侧时同样只报真正多出的部分",
-          missing == [] and [(r["text"], r["len"]) for r in extra] == [("@##", 3)],
-          f"实得 extra={extra} missing={missing}")
+    p2 = bank.make_passage("P2", None, ["It began as a lot. [3]____ , neighbors rebuilt it."])
+    check("题空号 [n]____ 被登记（完形填空取上下文依赖它）",
+          p2["blanks"] == [3], f"实得 {p2['blanks']}")
 
-    # 反向索引若只建一次、不随配对收缩，已消耗位置会被重复认领，整题直接静默通过。
-    extra, missing = bank.align_runs("甲乙", "乙甲")
-    check("完全调序不出现重复消耗（反向索引每轮重建）",
-          [r["text"] for r in extra] == ["甲乙"] and [r["text"] for r in missing] == ["乙甲"],
-          f"实得 extra={extra} missing={missing}")
+    check("常见缩写处不误切句",
+          bank.split_sentences("Mr. Bell kept a shop. He read books.") ==
+          ["Mr. Bell kept a shop.", "He read books."],
+          f"实得 {bank.split_sentences('Mr. Bell kept a shop. He read books.')}")
 
-    # 关键判据：宁多报、不静默。中间那个能配上的单字如果把两侧都缝住了，
-    # 漏抄就彻底消失 —— 这条钉住"配对阈值降到 1"的方案必须被拒绝。
-    extra, missing = bank.align_runs("乙", "甲乙丙")
-    check("单个可对上的字不得把整段漏抄缝成静默",
-          extra == [] and [r["text"] for r in missing] == ["甲乙丙"],
-          f"转写只抄了「乙」，原文「甲乙丙」整段没抄进去，必须告警；实得 missing={missing}")
-
-    # 编造必须抓到：转写里有一句原文没有的中文
-    src = "根据上述材料，可以得出以下结论"
-    xfr = "根据上述材料，众里寻他千百度可以得出以下结论"
-    extra, missing = bank.align_runs(xfr, src, min_len=2)
-    joined = "".join(r["text"] for r in extra)
-    check("转写中编造的中文被报为独有片段",
-          "众里寻他千百度" in joined and missing == [],
-          f"实得 extra={extra} missing={missing}")
-
-    # 漏抄必须抓到：反向
-    extra, missing = bank.align_runs(src, xfr, min_len=2)
-    joined = "".join(r["text"] for r in missing)
-    check("原文中存在而转写缺失的中文被报为漏抄",
-          "众里寻他千百度" in joined and extra == [],
-          f"实得 extra={extra} missing={missing}")
-
-    # 顺序错乱：实测**抓不到**（贪心按最长公共子串配对，跨半卷调序仍算对齐）。
-    # 这是内容级检查，不是顺序级检查 —— 钉住现状并对外声明，别让它躲在"双向比对"这句话里。
-    extra, missing = bank.align_runs("可以得出以下结论根据上述材料",
-                                     "根据上述材料，可以得出以下结论", min_len=2)
-    check("整块调序的行为被钉住（当前不可见）", extra == [] and missing == [],
-          f"实得 extra={extra} missing={missing}")
-    if extra == [] and missing == []:
-        limit("align_runs 只比内容不比顺序",
-              "两个大段落互换位置仍算对齐；它检查「有没有编造/漏抄内容」，不检查「抄对顺序」")
-
-    # 公式：令牌归一化把字母与数字一律塌成 '@'，所以**只有形状在检查范围内，内容不在**。
-    shape_same = (bank.normalize_for_compare(r"$AB=\sqrt{2}$")
-                  == bank.normalize_for_compare(r"$AB=\sqrt{3}$"))
-    check("公式内容（数字/函数名）在令牌归一化下的可见性被钉住",
-          shape_same is True,
-          f"实得 {bank.normalize_for_compare(r'$AB=\\sqrt{2}$')!r} vs "
-          f"{bank.normalize_for_compare(r'$AB=\\sqrt{3}$')!r}")
-    if shape_same:
-        limit("公式写错查不出来（文本层比对的天然盲区）",
-              r"$\sqrt{2}$→$\sqrt{3}$、$\sin$→$\cos$ 归一化后逐字符相同；"
-              "公式只能靠「存在性」（extract 的墨迹检查）与人工复核兜底")
-
-    # 单字替换：min_len=2 下被当噪声滤掉，实测不可见。
-    # 这正是 KNOWN_TEXT_LAYER_DEFECTS 台账（疾病/乘病）必须**人工**逐条写的根本原因——
-    # 自动比对着它瞎，所以台账不能由自动比对代替。
-    extra, missing = bank.align_runs("已知疾病的发生", "已知疾并的发生", min_len=2)
-    check("单字替换的行为被钉住（当前不可见）", extra == [] and missing == [],
-          f"实得 extra={extra} missing={missing}")
-    if extra == [] and missing == []:
-        limit("align_runs(min_len=2) 看不见一字之差",
-              "「疾病→疾并」这类单字替换会被配成对；需要逐字符比对或人工台账兜底")
-
-    # keep_math=False 只比文字层：公式段被剥掉
-    a = bank.normalize_for_compare("设 $x>0$，求最大值", keep_math=False)
-    b = bank.normalize_for_compare("设 ，求最大值")
-    check("keep_math=False 剥掉 $...$ 公式段", a == b, f"{a!r} != {b!r}")
+    # 折行还原：上传者若用整段 text 而非 paragraphs，空行分段
+    paras = bank.join_lines_into_paragraphs("line one\nline two\n\nnext para")
+    check("折行合并为段落、空行分段",
+          paras == ["line one line two", "next para"], f"实得 {paras}")
 
 
 # ---------------------------------------------------------------------------
@@ -178,10 +120,10 @@ def run_complete() -> None:
           it["answerable"] is False and any(v["severity"] == "error" for v in vs),
           f"实得 answerable={it.get('answerable')} vs={[v['code'] for v in vs]}")
 
-    # reason_override vs domain_reason —— 这次迁移里最容易搞错的一对
-    it, vs = bank.complete_item(item(), allowed="ABCD", reason_override="卷面被遮挡")
-    check("reason_override（解析缺损）写进 unparseable_reason → 计入损失账目",
-          it["unparseable_reason"] == "卷面被遮挡" and it["answerable"] is False,
+    # reason_override vs domain_reason —— 迁移里最容易搞错的一对
+    it, vs = bank.complete_item(item(), allowed="ABCD", reason_override="题面被遮挡")
+    check("reason_override（题面缺损）写进 unparseable_reason → 计入损失账目",
+          it["unparseable_reason"] == "题面被遮挡" and it["answerable"] is False,
           f"实得 {it['unparseable_reason']!r} / {it['answerable']}")
 
     it, vs = bank.complete_item(item(), allowed="ABCD",
@@ -197,17 +139,16 @@ def run_complete() -> None:
           any(v["severity"] == "error" for v in vs) and it["answerable"] is False,
           f"实得 vs={[v['code'] for v in vs]}")
 
-    # 字母表：拿 ABCD 要求听力题 = 把完好的题判成缺损（这次迁移真踩过的坑）
     it, vs = bank.complete_item(item(options={"A": "a", "B": "b", "C": "c"}),
                                 allowed="ABC", min_options=3)
-    check("按卷面实际字母表判定：A–C 的听力题不被误判为缺 D",
+    check("按题目自己的字母表判定：A–C 的题不被误判为缺 D",
           it["answerable"] is True and vs == [],
           f"实得 answerable={it['answerable']} vs={[(v['code'], v['detail']) for v in vs]}")
     it, vs = bank.complete_item(item(options={"A": "a", "B": "b", "C": "c"}),
                                 allowed="ABCD", min_options=3)
     check("同一道题用错字母表就会误判（记录这个反例的成因）",
           it["answerable"] is False,
-          "allowed 传错时应当报错 —— 这条钉住'听力缺 D'假告警的来源")
+          "allowed 传错时应当报错 —— 这条钉住'缺 D'假告警的来源")
 
     it, vs = bank.complete_item(item(stem=""), allowed="ABCD")
     check("空题干 → error 记录",
@@ -233,7 +174,7 @@ def run_renumber_loss() -> None:
           f"实得 {vs}")
 
     kept = [item(no=1, printed_no=1), item(no=2, printed_no=2), item(no=3, printed_no=3)]
-    loss = bank.build_loss([1, 2, 3, 4, 5], kept, dropped=[{"printed_no": 4, "reason": "选项未抽出"}])
+    loss = bank.build_loss([1, 2, 3, 4, 5], kept, dropped=[{"printed_no": 4, "reason": "选项未提供"}])
     check("见过 - 保留 - 显式 drop = never_parsed（静默丢题的会计式）",
           loss["never_parsed"] == [5] and loss["seen_printed_nos"] == 5 and loss["kept"] == 3,
           f"5 号既没条目也没入账，必须暴露在 never_parsed；实得 {loss['never_parsed']}")
@@ -262,7 +203,7 @@ def run_render() -> None:
 
     codes = registered_codes()
     check("能从 validation() 文档读到登记的 code 清单",
-          len(codes) >= 10, f"只解析出 {codes}")
+          len(codes) >= 20, f"只解析出 {len(codes)} 个：{codes}")
     bad = []
     for c in codes:
         try:
@@ -274,13 +215,12 @@ def run_render() -> None:
     check("文档里登记的每个 code 都能渲染",
           not bad, f"未登记于 render_validation：{bad}")
 
-    # 反方向更要命：解析器发了一个没登记的 code，不触发时静默、一触发就让
-    # render_validation 抛 KeyError，整份题库生成失败。transcription_unmatched
-    # 就是这么漏进去的——所以扫源码，不靠人记性。
+    # 反方向更要命：某个模块发了一个没登记的 code，不触发时静默、一触发就让
+    # render_validation 抛 KeyError，整份题库生成失败。所以扫源码，不靠人记性。
     emitted: dict[str, list[str]] = {}
     for p in sorted(Path(bank.__file__).resolve().parent.glob("**/*.py")):
         text = p.read_text(encoding="utf-8")
-        for m in re.finditer(r"bank\.validation\(\s*[\"']([a-z_]+)[\"']", text):
+        for m in re.finditer(r"(?:bank\.)?validation\(\s*[\"']([a-z_]+)[\"']", text):
             emitted.setdefault(m.group(1), []).append(
                 f"{p.name}:{text[:m.start()].count(chr(10)) + 1}")
     unregistered = {c: where for c, where in emitted.items() if c not in codes}
@@ -343,12 +283,12 @@ def run_identity_audit() -> None:
           sum(1 for o in out if o["severity"] == "error") == 2, f"实得 {[(o['severity']) for o in out]}")
 
     dup = [bad, bad, bad]
-    check("同一处身份漂移只报一条（不淹没报告，但 ids 类截断不适用）",
+    check("同一处身份漂移只报一条（不淹没报告）",
           len(bank.audit_validations(items, dup)) == 1,
           f"实得 {len(bank.audit_validations(items, dup))} 条")
 
     done = [dict(i, answerable=True, unparseable_reason=None, notice="") for i in items]
-    b = bank.build_bank(subject="测试", source="t.pdf", items=done, sections=[],
+    b = bank.build_bank(subject="测试", source="t.json", items=done, sections=[],
                         loss=bank.build_loss([76, 77], done), validations=[bad])
     check("带身份漂移的题库不允许 verified",
           b["meta"]["verified"] is False
@@ -366,12 +306,12 @@ def run_envelope() -> None:
     items, _ = bank.renumber([item(options={}, printed_no=1)], id_prefix="Q")
     done, vs = bank.complete_item(items[0], allowed="ABCD")
     loss = bank.build_loss([1], [done])
-    b = bank.build_bank(subject="测试", source="t.pdf", items=[done], sections=[],
+    b = bank.build_bank(subject="测试", source="t.json", items=[done], sections=[],
                         loss=loss, validations=vs, method="m")
     check("信封字段齐备且 bank_version=2",
           b["meta"]["bank_version"] == 2 and "loss" in b["meta"] and "report" in b,
           f"实得 {sorted(b['meta'])}")
-    check("verified 在无独立核验时为 False 且给出阻碍项",
+    check("verified 在无核验时为 False 且给出阻碍项",
           b["meta"]["verified"] is False and b["meta"]["verified_blockers"],
           f"实得 {b['meta'].get('verified')} / {b['meta'].get('verified_blockers')}")
     check("有 error 记录时阻碍 verified 并写明条数",
@@ -380,11 +320,11 @@ def run_envelope() -> None:
 
     clean = [dict(done, options={"A": "a", "B": "b", "C": "c"}, answerable=True,
                   unparseable_reason=None, notice="")]
-    b2 = bank.build_bank(subject="测试", source="t.pdf", items=clean, sections=[],
+    b2 = bank.build_bank(subject="测试", source="t.json", items=clean, sections=[],
                          loss=bank.build_loss([1], clean), validations=[])
     check("干净但未核验的题库 verified=False", b2["meta"]["verified"] is False, "不该自己盖章")
-    b2["meta"]["verification"] = {"by": "extract/verify.py", "at": "x"}
-    check("独立核验盖章 + 账目干净 → verified=True",
+    b2["meta"]["verification"] = {"by": "外部核验流程", "at": "x"}
+    check("核验盖章 + 账目干净 → verified=True",
           bank.apply_verified(b2)["meta"]["verified"] is True,
           f"实得 {b2['meta'].get('verified_blockers')}")
 
@@ -420,9 +360,9 @@ def _raises(exc, fn, *a, **kw) -> bool:
 # ---------------------------------------------------------------------------
 def main() -> int:
     print("=" * 70)
-    print("门禁 7：bank.py 纯函数测试（不依赖任何题库文件）")
+    print("门禁：bank.py 纯函数测试（不依赖任何题库文件）")
     print("=" * 70)
-    run_align()
+    run_text()
     run_complete()
     run_renumber_loss()
     run_render()

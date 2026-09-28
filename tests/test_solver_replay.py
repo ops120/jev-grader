@@ -11,7 +11,8 @@ group 步按选项字母取回 noul 值。因此比对排除的只有 solver 自
 
 跑法：python tests/test_solver_replay.py     退出码 0 = 全卷一致（或差异全部在台账内）
 
-题库与轨迹都在本机（不入库）；缺失时跳过并如实说明跳过了多少。
+目标 = 本机 data/banks/ 里发现的题库（读不出的带原因列出）；需要该卷已求解过
+（轨迹在 data/traces_<id>/）。没有题库或没有轨迹时跳过并如实说明。
 """
 from __future__ import annotations
 
@@ -24,8 +25,9 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import papers  # noqa: E402
+from _targets import discovered_targets  # noqa: E402
 import solver  # noqa: E402
 
 # solver 在 compose 之后追加的运行期字段：不是判定内容，重放无从复现
@@ -127,14 +129,14 @@ def explain(pid: str, rid: str, stored: dict, diffs: list[tuple[str, str]]) -> s
             f"现行实现会改判为其余选项中概率最高者")
 
 
-async def run_paper(cfg: dict) -> tuple[int, int, int, list[str], list[str]]:
+async def run_paper(pid: str, specs: tuple, exam: dict,
+                    traces: Path) -> tuple[int, int, int, list[str], list[str]]:
     """返回 (重放题数, 一致题数, 台账内差异题数, 硬失败明细, 台账明细)。"""
-    exam = json.loads(cfg["exam"].read_text(encoding="utf-8"))
     passages = {p["id"]: p for p in exam.get("passages", [])}
     pending: dict[tuple[str, str], dict] = {}
     stored: dict[str, dict] = {}
     for item in exam["items"]:
-        trace_file = cfg["traces"] / f"{item['id']}.json"
+        trace_file = traces / f"{item['id']}.json"
         if not item.get("answerable") or not trace_file.exists():
             continue
         trace = json.loads(trace_file.read_text(encoding="utf-8"))
@@ -154,8 +156,7 @@ async def run_paper(cfg: dict) -> tuple[int, int, int, list[str], list[str]]:
     bad: list[str] = []
     known: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:      # 绝不往真实轨迹目录写
-        work = dict(cfg)
-        work["traces"] = Path(tmp)
+        work = {"id": pid, "specs": specs, "traces": Path(tmp)}
         results = await asyncio.gather(*(
             solver.solve_one(client, it, passages.get(it.get("passage_id")), sem, False, work)
             for it in exam["items"] if it["id"] in stored))
@@ -164,11 +165,11 @@ async def run_paper(cfg: dict) -> tuple[int, int, int, list[str], list[str]]:
             if r["status"] != "ok":
                 bad.append(f"{rid}: status={r['status']} {r.get('detail', '')}")
                 continue
-            new = json.loads((work["traces"] / f"{rid}.json").read_text(encoding="utf-8"))
+            new = json.loads((Path(tmp) / f"{rid}.json").read_text(encoding="utf-8"))
             diffs = diff_fields(strip(stored[rid]), strip(new))
             if not diffs:
                 continue
-            why = explain(cfg["id"], rid, strip(stored[rid]), diffs)
+            why = explain(pid, rid, strip(stored[rid]), diffs)
             line = f"{rid}: " + ", ".join(f"{s}.{f}" for s, f in diffs)
             (known if why else bad).append(f"{line} —— {why}" if why else line)
     n = len(stored)
@@ -179,13 +180,22 @@ def main() -> int:
     hard: list[str] = []
     total = same = known_total = 0
     ledger_ids: list[str] = []
-    for pid, cfg in papers.PAPERS.items():
-        if not cfg["exam"].exists() or not cfg["traces"].exists():
-            print(f"  SKIP  {pid:<8} 题库或轨迹缺失，这道门禁未生效")
+    targets = discovered_targets()
+    if not targets:
+        print("  SKIP  本机没有任何题库（data/banks/ 为空且无旧版迁移文件），这道门禁未生效")
+        return 0
+    for t in targets:
+        pid = t["id"]
+        if t["error"]:
+            print(f"  ----  {pid:<12} 题库读不出/不完整：{t['error']}")
             continue
-        n, ok, known, bad, detail = asyncio.run(run_paper(cfg))
+        if not t["traces"] or not t["traces"].exists():
+            print(f"  SKIP  {pid:<12} 无轨迹目录，这道门禁未生效")
+            continue
+        n, ok, known, bad, detail = asyncio.run(
+            run_paper(pid, t["specs"], t["envelope"], t["traces"]))
         if not n:
-            print(f"  ----  {pid:<8} 轨迹里没有 request 字段，无可重放载荷")
+            print(f"  ----  {pid:<12} 轨迹里没有 request 字段，无可重放载荷")
             continue
         total += n
         same += ok
@@ -193,7 +203,7 @@ def main() -> int:
         ledger_ids += detail
         hard += [f"{pid}/{m}" for m in bad]
         note = f"（含台账 {known}）" if known else ""
-        print(f"  {'OK  ' if not bad else 'FAIL'}  {pid:<8} 重放 {n} 题："
+        print(f"  {'OK  ' if not bad else 'FAIL'}  {pid:<12} 重放 {n} 题："
               f"{ok} 题逐字段等于历史轨迹{note}")
 
     if ledger_ids:

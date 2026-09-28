@@ -8,7 +8,10 @@ solver 早先只判断"文件在不在"，于是会把别人的答案当成本�
 旧轨迹必须重算。用一个"被调用就抛"的假客户端来证明它到底有没有复用缓存，
 因此零配额。
 
-跑法：python tests/test_cache_identity.py     退出码 0 = 三种情形都按预期
+跑法：python tests/test_cache_identity.py     退出码 0 = 四种情形都按预期
+
+目标 = 本机题库里第一份有 ≥2 道可作答题的卷；本机没有题库时退回随仓库分发的
+模板卷（走生产上传管线取信封），所以这道门禁在任何机器上都真实生效。
 """
 from __future__ import annotations
 
@@ -20,12 +23,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import papers  # noqa: E402
+from _targets import all_targets  # noqa: E402
 import solver  # noqa: E402
 from judge import engine, spec as spec_mod  # noqa: E402
-
-PAPER = "xc_ds"
 
 
 class Boom:
@@ -53,11 +55,21 @@ async def run_case(cfg: dict, item: dict, passage: dict | None, trace) -> dict:
 
 
 def main() -> int:
-    cfg = papers.get(PAPER)
-    if not cfg["exam"].exists():
-        print(f"  SKIP  {PAPER} 题库缺失，这道门禁未生效")
+    pick = None
+    for t in all_targets():                    # 本机题库优先，其次模板卷（永远存在）
+        if t["error"]:
+            if not t["local"]:
+                print(f"模板卷读不出：{t['error']}")
+                return 1
+            continue
+        if len([i for i in t["envelope"]["items"] if i.get("answerable")]) >= 2:
+            pick = t
+            break
+    if pick is None:
+        print("  SKIP  没有任何含 ≥2 道可作答题的题库，这道门禁未生效")
         return 0
-    exam = json.loads(cfg["exam"].read_text(encoding="utf-8"))
+    cfg = {"id": pick["id"], "specs": pick["specs"], "traces": pick["traces"] or Path(".")}
+    exam = pick["envelope"]
     by_passage = {p["id"]: p for p in exam.get("passages", [])}
     answerable = [i for i in exam["items"] if i.get("answerable")]
     # 取两道题：一道当"本题"，一道提供"别人的请求"当串题缓存
@@ -67,6 +79,8 @@ def main() -> int:
     theirs = payload_of(cfg, other, by_passage.get(other.get("passage_id")))
     assert engine.fingerprint(**mine) != engine.fingerprint(**theirs), \
         "两道题的载荷竟然相同，这个用例选得没意义"
+    print(f"  目标题库：{pick['id']}（{'本机' if pick['local'] else '随仓库模板卷'}）·"
+          f"本题 {item['id']}、串题缓存用 {other['id']}")
 
     failures: list[str] = []
 
